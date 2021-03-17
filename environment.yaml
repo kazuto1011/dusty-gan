@@ -1,0 +1,20 @@
+name: dusty-gan
+dependencies:
+  - cudatoolkit=10.2
+  - matplotlib
+  - python=3.7
+  - pytorch::pytorch
+  - pytorch::torchvision
+  - tqdm
+  - pip:
+    - black
+    - hydra-core
+    - hydra_colorlog
+    - joblib
+    - mypy
+    - omegaconf
+    - opencv-python
+    - scikit-learn
+    - tensorflow
+    - numba
+    - psutil
