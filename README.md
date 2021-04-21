@@ -23,9 +23,7 @@ The top two rows are from our generator and the third row is a final inverse dep
 **Corruption recovery by optimizing a latent code:**
 ![KITTI corruption recovery](docs/corruption_recovery.png)
 
-**Training/evaluation scripts will also be added soon**
-
-<!-- ## Requirements
+## Requirements
 
 ```sh
 $ conda env create -f environment.yaml
@@ -34,33 +32,32 @@ $ conda activate dusty-gan
 
 ## Datasets
 
-### KITTI Odometry set
-
-Velodyne HDL-64E
-
-### MPO Sparse set
-
-Velodyne HDL-32E
+To setup KITTI Odometry dataset, please follow [this instruction](docs/setup_kitti).
 
 ## Training
 
 ```sh
-$ python train.py
+$ python train.py dataset=kitti_odometry solver=nsgan model=dcgan_eqlr
+$ python train.py dataset=kitti_odometry solver=nsgan model=dusty1_dcgan_eqlr
+$ python train.py dataset=kitti_odometry solver=nsgan model=dusty2_dcgan_eqlr
 ```
+
+This repository uses `hydra` framework to manage different configurations.
+Each run creates a unique directory like `outputs/<SETTINGS>/<DATE>/<TIME>` with models and TensorBoard file.
+
+To monitor loss, run the following command to launch TensorBoard.
+
+```sh
+$ tensorboard --logdir outputs
+```
+
+![](docs/tb.png)
 
 ## Evaluation
 
-### Synthesis
-
 ```sh
-$ python test.py
+$ python evaluate.py --model-path outputs/<SETTINGS>/<DATE>/<TIME>/models/checkpoint_0025000000.pth
 ```
-
-### Reconstruction
-
-```sh
-$ python test.py
-``` -->
 
 ## Citation
 

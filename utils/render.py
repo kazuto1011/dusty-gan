@@ -3,6 +3,7 @@ import matplotlib.cm as cm
 import numba
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from utils import denorm_range
 from utils.geometry import estimate_surface_normal
@@ -21,26 +22,35 @@ def scatter(array, index, value, mask):
 
 
 def colorize(tensor, cmap="turbo", vmax=0.4):
-    tensor = tensor[..., 0]
+    assert tensor.ndim == 2
     normalizer = matplotlib.colors.Normalize(vmin=0.0, vmax=vmax)
     mapper = cm.ScalarMappable(norm=normalizer, cmap=cmap)
     tensor = mapper.to_rgba(tensor)[..., :3]
     return tensor
 
 
-def render_pcs(points, normals, L=512, zoom=3.0, R=None):
-    B, _, _ = points.shape
+def make_bev(points, normals, L=512, zoom=3.0, R=None):
+    B, _, _, _ = points.shape
+
+    points = points.flatten(2).transpose(1, 2)  # B,N,3
     if R is not None:
         points = points @ R
     points = denorm_range(points * zoom)
     points = points.detach().cpu().numpy()
     points = np.int32(points[..., :2] * L)
+
     mask = (0 < points) & (points < L - 1)
     mask = np.logical_and.reduce(mask, axis=2, keepdims=True)
+
+    normals = normals.flatten(2).transpose(1, 2)  # B,N,3
     normals = normals.detach().cpu().numpy()
-    bev = np.ones((B, L, L, 3))
+    normals *= mask
+
+    bev = np.ones((B, L, L, 3))  # white background
     bev = scatter(bev, points, normals, mask)
     bev = torch.from_numpy(bev.transpose(0, 3, 1, 2))
+    # morphological erosion for visual purpose
+    bev = -F.max_pool2d(-bev, kernel_size=3, stride=1)
     return bev
 
 

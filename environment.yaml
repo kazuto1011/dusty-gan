@@ -1,9 +1,9 @@
 name: dusty-gan
 dependencies:
-  - cudatoolkit=10.2
+  - cudatoolkit=11.0
   - matplotlib
   - python=3.7
-  - pytorch::pytorch
+  - pytorch::pytorch=1.7.1
   - pytorch::torchvision
   - tqdm
   - pip:

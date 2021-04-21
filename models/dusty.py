@@ -83,7 +83,7 @@ class DUSty1(nn.Module):
 
         mask = self.gumbel(mask_logit, threshold)
 
-        output["depth_pre"] = depth
+        output["depth_orig"] = depth
         output["mask"] = mask
         output["depth"] = mask * depth + (1 - mask) * self.drop_const
 
@@ -119,7 +119,7 @@ class DUSty2(nn.Module):
             mask_image = (mask_logit[:, [1]] > 0.0).float()
         mask = mask_pixel * mask_image
 
-        output["depth_pre"] = depth
+        output["depth_orig"] = depth
         output["mask"] = torch.cat([mask_pixel, mask_image], dim=1)
         output["depth"] = mask * depth + (1 - mask) * self.drop_const
 

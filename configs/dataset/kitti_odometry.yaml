@@ -1,0 +1,8 @@
+dataset:
+  name: kitti_odometry
+  lidar: hdl64e
+  root: /media/kazuto1011/extssd/Datasets/SemanticKITTI/dusty-gan
+  shape: [64, 256]
+  min_depth: 0.9
+  max_depth: 120.0
+  flip: false

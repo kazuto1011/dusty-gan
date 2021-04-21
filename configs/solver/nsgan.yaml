@@ -1,0 +1,44 @@
+solver:
+  total_kimg: 25000
+  smoothing_kimg: 10
+  batch_size: 32
+  num_accumulation: 1
+  validation:
+    num_data: 2048
+    num_points: 2048
+  checkpoint:
+    test: 10000
+    save_model: 10000
+    save_image: 5000
+    save_stats: 100
+  gan_mode: nsgan
+  instance_noise: false
+  label:
+    fake: 0
+    real: 1
+    smoothing: 1
+  loss:
+    gan: 1
+    gp: 1
+    pl: 0 #2
+    smooth: 0
+    mask: 0
+  lr:
+    alpha:
+      decay:
+        gamma: 1
+        step_size: 1
+      dis: 0.002
+      gen: 0.002
+    beta1: 0
+    beta2: 0.99
+  mix_prob: 0.0
+  lazy:
+    gp: 1 #16
+    pl: 1 #4
+  augment: 
+    - brightness
+    - saturation
+    - contrast
+    - translation
+    - cutout

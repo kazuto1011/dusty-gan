@@ -1,0 +1,8 @@
+dataset:
+  name: sparse_mpo
+  lidar: hdl32e
+  root: 
+  shape: [32, 256]
+  min_depth: 0.9
+  max_depth: 120.0
+  flip: true

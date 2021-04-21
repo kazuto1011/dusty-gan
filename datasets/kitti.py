@@ -29,7 +29,7 @@ class KITTIOdometry(torch.utils.data.Dataset):
         modality=("depth"),
     ):
         super().__init__()
-        self.root = root
+        self.root = osp.join(root, "sequences")
         self.split = split
         self.config = config
         self.subsets = np.asarray(self.config["split"][split])

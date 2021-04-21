@@ -118,7 +118,7 @@ AUGMENT_FNS = {
 }
 
 
-class Augmenter(nn.Module):
+class DiffAugment(nn.Module):
     def __init__(self, policy=None, p=1.0):
         super().__init__()
         if policy is None:
