@@ -32,7 +32,7 @@ $ conda activate dusty-gan
 
 ## Datasets
 
-To setup KITTI Odometry dataset, please follow [this instruction](docs/setup_kitti).
+To setup KITTI Odometry dataset, please follow [this instruction](docs/setup_kitti.md).
 
 ## Training
 
