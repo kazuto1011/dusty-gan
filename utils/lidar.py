@@ -1,7 +1,11 @@
 import os
 
+import einops
 import torch
+import torch.nn.functional as F
 from torch import nn
+
+from . import render
 
 
 class Coordinate(nn.Module):
@@ -11,43 +15,51 @@ class Coordinate(nn.Module):
         self.max_depth = max_depth
         self.H, self.W = shape
         self.drop_const = drop_const
-        self.register_buffer("grid", self.init_coordmap(self.H, self.W))
+        self.register_buffer("angle", self.init_coordmap(self.H, self.W))
 
     def init_coordmap(self, H, W):
         raise NotImplementedError
 
-    def minmax_norm(self, tensor, vmin: float, vmax: float):
+    @staticmethod
+    def normalize_minmax(tensor, vmin: float, vmax: float):
         return (tensor - vmin) / (vmax - vmin)
 
-    def minmax_denorm(self, tensor, vmin: float, vmax: float):
+    @staticmethod
+    def denormalize_minmax(tensor, vmin: float, vmax: float):
         return tensor * (vmax - vmin) + vmin
 
     def invert_depth(self, norm_depth):
         # depth to inverse depth
-        depth = self.minmax_denorm(norm_depth, self.min_depth, self.max_depth)
+        depth = self.denormalize_minmax(norm_depth, self.min_depth, self.max_depth)
         disp = 1 / depth
-        norm_disp = self.minmax_norm(disp, 1 / self.max_depth, 1 / self.min_depth)
+        norm_disp = self.normalize_minmax(disp, 1 / self.max_depth, 1 / self.min_depth)
         return norm_disp
 
     def revert_depth(self, norm_disp, norm=True):
         # inverse depth to depth
-        disp = self.minmax_denorm(norm_disp, 1 / self.max_depth, 1 / self.min_depth)
+        disp = self.denormalize_minmax(
+            norm_disp, 1 / self.max_depth, 1 / self.min_depth
+        )
         depth = 1 / disp
         if norm:
-            return self.minmax_norm(depth, self.min_depth, self.max_depth)
+            return self.normalize_minmax(depth, self.min_depth, self.max_depth)
         else:
             return depth
 
-    def invert_cyl(self, norm_cyl):
-        norm_cyl[:, 0] = self.invert_depth(norm_cyl[:, 0])
-        return norm_cyl
+    def pol_to_xyz(self, polar):
+        assert polar.dim() == 4
+        grid_cos = torch.cos(self.angle)
+        grid_sin = torch.sin(self.angle)
+        grid_x = polar * grid_cos[:, [0]] * grid_cos[:, [1]]
+        grid_y = polar * grid_cos[:, [0]] * grid_sin[:, [1]]
+        grid_z = polar * grid_sin[:, [0]]
+        return torch.cat((grid_x, grid_y, grid_z), dim=1)
 
-    def revert_cyl(self, norm_cyl):
-        norm_cyl[:, 0] = self.revert_depth(norm_cyl[:, 0])
-        return norm_cyl
+    def xyz_to_pol(self, xyz):
+        return torch.norm(xyz, p=2, dim=1, keepdim=True)
 
-    def inv_depth_to_points(self, inv_depth, threshold=1e-8):
-        valid = torch.abs(inv_depth - self.drop_const) > threshold
+    def inv_to_xyz(self, inv_depth, tol=1e-8):
+        valid = torch.abs(inv_depth - self.drop_const) > tol
         depth = self.revert_depth(inv_depth)  # [0,1] depth
         depth = depth * (self.max_depth - self.min_depth) + self.min_depth
         depth /= self.max_depth
@@ -55,47 +67,44 @@ class Coordinate(nn.Module):
         points = self.pol_to_xyz(depth)
         return points
 
-    def pol_to_xyz(self, polar):
-        assert polar.dim() == 4
-        grid_cos = torch.cos(self.grid)
-        grid_sin = torch.sin(self.grid)
-        grid_x = polar * grid_cos[:, [0]] * grid_cos[:, [1]]
-        grid_y = polar * grid_cos[:, [0]] * grid_sin[:, [1]]
-        grid_z = polar * grid_sin[:, [0]]
-        return torch.cat((grid_x, grid_y, grid_z), dim=1)
+    def points_to_depth(self, xyz, drop_value=1, tol=1e-8, tau=2):
+        assert xyz.ndim == 3
+        device = xyz.device
 
-    def pol_to_cyl(self, pol_depth):
-        _, _, H, W = pol_depth.shape
-        device = pol_depth.device
-        grid_elev, _ = self._generate_coordmap(H, W, device)
-        map_R = pol_depth * torch.cos(grid_elev)
-        map_Z = pol_depth * torch.sin(grid_elev)
-        return torch.cat((map_R, map_Z), dim=1)
+        x = xyz[..., [0]]
+        y = xyz[..., [1]]
+        z = xyz[..., [2]]
+        r = torch.norm(xyz[..., :2], p=2, dim=2, keepdim=True)
+        depth_1d = torch.norm(xyz, p=2, dim=2, keepdim=True)
+        weight = 1.0 / torch.exp(tau * depth_1d)
+        depth_1d = depth_1d * self.max_depth
+        weight *= ((depth_1d > self.min_depth) & (depth_1d < self.max_depth)).detach()
 
-    def xyz_to_pol(self, xyz):
-        return torch.norm(xyz, p=2, dim=1, keepdim=True)
+        angle_u = torch.atan2(z, r)  # elevation
+        angle_v = torch.atan2(y, x)  # azimuth
+        angle_uv = torch.cat([angle_u, angle_v], dim=2)
+        angle_uv = einops.rearrange(angle_uv, "b n c -> b n 1 c")
+        angle_uv_ref = einops.rearrange(self.angle, "b c h w -> b 1 (h w) c")
 
-    def xyz_to_cyl(self, xyz):
-        xy, z = xyz[:, :2], xyz[:, [2]]
-        r = torch.norm(xy, p=2, dim=1, keepdim=True)
-        return torch.cat([r, z], dim=1)
+        _, ids = torch.norm(angle_uv - angle_uv_ref, p=2, dim=3).min(dim=2)
+        id_to_uv = einops.rearrange(
+            torch.stack(
+                torch.meshgrid(
+                    torch.arange(self.H, device=device),
+                    torch.arange(self.W, device=device),
+                ),
+                dim=-1,
+            ),
+            "h w c -> (h w) c",
+        )
+        uv = F.embedding(ids, id_to_uv).float()
+        depth_2d = render.bilinear_rasterizer(uv, weight * depth_1d, (self.H, self.W))
+        depth_2d /= render.bilinear_rasterizer(uv, weight, (self.H, self.W)) + 1e-8
+        valid = depth_2d != 0
+        depth_2d = self.minmax_norm(depth_2d, self.min_depth, self.max_depth)
+        depth_2d[~valid] = drop_value
 
-    def cyl_to_xyz(self, cyl):
-        r, z = cyl[:, [0]], cyl[:, [1]]
-        grid_cos = torch.cos(self.grid)
-        grid_sin = torch.sin(self.grid)
-        x = r * grid_cos[:, [1]]
-        y = r * grid_sin[:, [1]]
-        return torch.cat((x, y, z), dim=1)
-
-    def cyl_to_pol(self, cyl):
-        r, z = cyl[:, [0]], cyl[:, [1]]
-        return torch.sqrt(r ** 2 + z ** 2)
-
-    def cyl_to_mask(self, cyl, threshhold=1e-8):
-        r, z = cyl[:, [0]], cyl[:, [1]]
-        mask = (r > threshhold) & (torch.abs(z) > threshhold)
-        return mask
+        return depth_2d, valid
 
 
 class LiDAR(Coordinate):
@@ -116,5 +125,6 @@ class LiDAR(Coordinate):
         )
 
     def init_coordmap(self, H, W):
-        grid = torch.load(self.angle_file)[None]
-        return grid
+        angle = torch.load(self.angle_file)[None]
+        angle = F.interpolate(angle, size=(H, W), mode="bilinear")
+        return angle

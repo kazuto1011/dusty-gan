@@ -2,6 +2,7 @@ import argparse
 import multiprocessing
 import os
 import os.path as osp
+from collections import defaultdict
 from glob import glob
 
 import joblib
@@ -72,8 +73,8 @@ def projection(source, grid, order, H, W):
     return proj
 
 
-def process_point_clouds(point_path):
-    save_dir = lambda x: x.replace("dataset", "dusty-gan")
+def process_point_clouds(point_path, H=64, W=2048):
+    save_dir = lambda x: x.replace("dataset/sequences", "dusty-gan/sequences")
 
     # setup point clouds
     points = np.fromfile(point_path, dtype=np.float32).reshape((-1, 4))
@@ -130,51 +131,56 @@ def process_point_clouds(point_path):
         labels.save(save_path)
 
 
+def mean(tensor, dim):
+    tensor = tensor.clone()
+    kwargs = {"dim": dim, "keepdim": True}
+    valid = (~tensor.isnan()).float()
+    tensor[tensor.isnan()] = 0
+    tensor = torch.sum(tensor * valid, **kwargs) / valid.sum(**kwargs)
+    return tensor
+
+
+@torch.no_grad()
 def compute_avg_angles(loader):
-    def mean(tensor_, dim):
-        tensor = tensor_.clone()
-        kwargs = {"dim": dim, "keepdim": True}
-        valid = (~torch.isnan(tensor)).float()
-        tensor[tensor.isnan()] = 0
-        tensor = torch.sum(tensor * valid, **kwargs) / valid.sum(**kwargs)
-        return tensor
 
     max_depth = loader.dataset.max_depth
 
-    xyz = []
+    summary = defaultdict(float)
+
     for item in tqdm(loader):
         xyz_batch = item["xyz"]
-        xyz.append(xyz_batch)
 
-    xyz = torch.cat(xyz, dim=0)
-    depth = torch.norm(xyz, p=2, dim=1, keepdim=True) * max_depth
-    print(depth.shape, depth.max(), depth.min())
+        x = xyz_batch[:, [0]]
+        y = xyz_batch[:, [1]]
+        z = xyz_batch[:, [2]]
 
-    valid = (depth > 1e-8).float()
-    total_valid = valid.sum(dim=0)
+        depth = torch.sqrt(x ** 2 + y ** 2 + z ** 2) * max_depth
+        valid = (depth > 1e-8).float()
+        summary["total_data"] += len(valid)
+        summary["total_valid"] += valid.sum(dim=0)  # (1,64,2048)
 
-    xy, z = xyz[:, :2], xyz[:, [2]]
-    r = torch.norm(xy, p=2, dim=1, keepdim=True)
+        r = torch.sqrt(x ** 2 + y ** 2)
+        pitch = torch.atan2(z, r)
+        yaw = torch.atan2(y, x)
+        summary["pitch"] += torch.sum(pitch * valid, dim=0)
+        summary["yaw"] += torch.sum(yaw * valid, dim=0)
 
-    x = xyz[:, [0]]
-    y = xyz[:, [1]]
+    summary["pitch"] = summary["pitch"] / summary["total_valid"]
+    summary["yaw"] = summary["yaw"] / summary["total_valid"]
+    angles = torch.cat([summary["pitch"], summary["yaw"]], dim=0)
 
-    pitch = torch.atan2(z, r)
-    yaw = torch.atan2(y, x)
+    mean_pitch = mean(summary["pitch"], 2).expand_as(summary["pitch"])
+    mean_yaw = mean(summary["yaw"], 1).expand_as(summary["yaw"])
+    mean_angles = torch.cat([mean_pitch, mean_yaw], dim=0)
 
-    pitch = torch.sum(pitch * valid, dim=0) / total_valid
-    yaw = torch.sum(yaw * valid, dim=0) / total_valid
-    angles = torch.cat([pitch, yaw], dim=0)
-
-    mean_p = mean(pitch, 2).expand_as(pitch)
-    mean_y = mean(yaw, 1).expand_as(yaw)
-    mean_angles = torch.cat([mean_p, mean_y], dim=0)
-
-    valid = (~torch.isnan(angles)).float()
-    angles[torch.isnan(angles)] = 0.0
+    mean_valid = summary["total_valid"] / summary["total_data"]
+    valid = (mean_valid > 0).float()
+    angles[angles.isnan()] = 0.0
     angles = valid * angles + (1 - valid) * mean_angles
 
-    return angles
+    assert angles.isnan().sum() == 0
+
+    return angles, mean_valid
 
 
 if __name__ == "__main__":
@@ -184,9 +190,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # 2D maps
-
     split_dirs = sorted(glob(osp.join(args.root_dir, "dataset/sequences", "*")))
-    H, W = 64, 256
+    H, W = 64, 2048
 
     for split_dir in tqdm(split_dirs):
         point_paths = sorted(glob(osp.join(split_dir, "velodyne", "*.bin")))
@@ -194,17 +199,16 @@ if __name__ == "__main__":
             n_jobs=multiprocessing.cpu_count(), verbose=10, pre_dispatch="all"
         )(
             [
-                joblib.delayed(process_point_clouds)(point_path)
+                joblib.delayed(process_point_clouds)(point_path, H, W)
                 for point_path in point_paths
             ]
         )
 
     # average angles
-
     dataset = KITTIOdometry(
-        root=osp.join(args.root_dir, "dusty-gan/sequences"),
+        root=osp.join(args.root_dir, "dusty-gan"),
         split="train",
-        shape=(64, 256),
+        shape=(H, W),
     )
     loader = torch.utils.data.DataLoader(
         dataset,
@@ -213,7 +217,6 @@ if __name__ == "__main__":
         drop_last=False,
     )
     N = len(dataset)
-    print(dataset)
 
-    angles = compute_avg_angles(loader)
-    torch.save(angles, osp.join(args.root_dir, "dusty-gan/angles.pt"))
+    angles, valid = compute_avg_angles(loader)
+    torch.save(angles, osp.join(args.root_dir, "angles.pt"))

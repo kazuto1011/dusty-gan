@@ -1,29 +1,24 @@
 # Learning to Drop Points for LiDAR Scan Synthesis
 
-![](docs/overview.png)
+*From left to right: a learned depth map, a measurabitlity map for sampling pixels, and a sampled depth map*
+<img src='https://user-images.githubusercontent.com/9032347/127803595-6e378bab-f709-4476-a528-73460a503e76.gif' width='100%' style='image-rendering: pixelated;'>
 
 **Learning to Drop Points for LiDAR Scan Synthesis**<br>
-Kazuto Nakashima, Ryo Kurazume<br>
-https://arxiv.org/abs/2102.11952
+[Kazuto Nakashima](https://kazuto1011.github.io/) and Ryo Kurazume<br>
+In IROS 2021<br>
+[[arXiv]](https://arxiv.org/abs/2102.11952)
 
-**Overview:** The goal of this study is to build a generative model of 3D LiDAR data (Velodyne-style radiated point clouds).
-The LiDAR data can be processed as bijective 2D maps but susceptible to scattered binary noises in practice.
-The binary noises are caused by failing laser reflection from measured objects.
-To circumvent this issue, we propose a noise-aware GAN framework to synthesize LiDAR scan data.
-Our generator is designed to produce an inverse depth map and simultaneously simulate point drops as multiplicative Bernoulli noises.
-To sample the discrete noises, we employ a pixel-wise reparameterization with straight-through Gumbel-Sigmoid distribution.
-Our approach enables to learn an underlying smooth depth manifold.
-In our paper, we demonstrate the effectiveness in synthesis and reconstruction tasks on two LiDAR datasets.
-We further showcase potential applications by recovering various corruptions in LiDAR data.
+**Overview:** We propose a noise-aware GAN for 3D LiDAR data, which learns inverse depth and measurement uncertainty on 2D representation from a collection of real LiDAR data involving dropout noises.
 
-**Generation by interpolating learned latent codes:**<br>
-The top two rows are from our generator and the third row is a final inverse depth map processed with a point-drop mask.
-![KITTI generation](docs/kitti.gif)
+![](docs/model.svg)
 
-**Corruption recovery by optimizing a latent code:**
-![KITTI corruption recovery](docs/corruption_recovery.png)
+**Reconstruction:** A trained generator can be used as a scene prior to restore LiDAR data.
+
+<img src='docs/example.svg' width='100%' style='image-rendering: pixelated;'>
 
 ## Requirements
+
+To setup with anaconda:
 
 ```sh
 $ conda env create -f environment.yaml
@@ -32,32 +27,74 @@ $ conda activate dusty-gan
 
 ## Datasets
 
-To setup KITTI Odometry dataset, please follow [this instruction](docs/setup_kitti.md).
+[Instruction for KITTI Odometry](datasets/README)
 
 ## Training
 
-```sh
-$ python train.py dataset=kitti_odometry solver=nsgan model=dcgan_eqlr
-$ python train.py dataset=kitti_odometry solver=nsgan model=dusty1_dcgan_eqlr
-$ python train.py dataset=kitti_odometry solver=nsgan model=dusty2_dcgan_eqlr
-```
-
-This repository uses `hydra` framework to manage different configurations.
-Each run creates a unique directory like `outputs/<SETTINGS>/<DATE>/<TIME>` with models and TensorBoard file.
-
-To monitor loss, run the following command to launch TensorBoard.
+Please use `train.py` with `dataset=`, `solver=`, and `model=` options.
+The default configurations are defined under `configs/` and can be overridden via a console ([reference](https://hydra.cc/docs/advanced/override_grammar/basic)).
 
 ```sh
-$ tensorboard --logdir outputs
+$ python train.py dataset=kitti_odometry solver=nsgan_eqlr model=dcgan_eqlr # baseline
+$ python train.py dataset=kitti_odometry solver=nsgan_eqlr model=dusty1_dcgan_eqlr # DUSty-I (ours)
+$ python train.py dataset=kitti_odometry solver=nsgan_eqlr model=dusty2_dcgan_eqlr # DUSty-II (ours)
 ```
 
-![](docs/tb.png)
+Each run creates a unique directory with saved weights and log file.
+
+```sh
+outputs/logs
+└── dataset=<DATASET>
+    └── model=<MODEL>
+        └── solver=<SOLVER>
+            └── <DATE>
+                └── <TIME>
+                    ├── .hydra
+                    │   └── config.yaml # all configuration parameters
+                    ├── models
+                    │   ├── ...
+                    │   └── checkpoint_0025000000.pth # trained weights
+                    └── runs
+                        └── <TENSORBOARD FILES> # logged losses, scores, and images
+```
+
+To monitor losses, scores and images, run the following command to launch TensorBoard.
+
+```sh
+$ tensorboard --logdir outputs/logs
+```
 
 ## Evaluation
 
+To evaluate synthesis performance, run:
+
 ```sh
-$ python evaluate.py --model-path outputs/<SETTINGS>/<DATE>/<TIME>/models/checkpoint_0025000000.pth
+$ python evaluate_synthesis.py --model-path $MODEL_PATH --config-path $CONFIG_PATH
 ```
+
+`MODEL_PATH` and `CONFIG_PATH` are `.pth` file and the corresponding `.hydra/config.yaml` file, respectively.
+A relative tolerance to detect the point-drop can be changed via `--tol` option (default `0`).
+
+To evaluate reconstruction performance, run:
+
+```sh
+$ python evaluate_reconstruction.py --model-path $MODEL_PATH --config-path $CONFIG_PATH
+```
+
+To optimize the relative tolerance for the baseline in our paper, run:
+
+```sh
+$ python tune_tolerance.py --model-path $MODEL_PATH --config-path $CONFIG_PATH
+```
+
+We used `0.008` for KITTI.
+
+## Demo
+
+```sh
+$ streamlit run demo.py $MODEL_PATH $CONFIG_PATH
+```
+![](docs/streamlit.png)
 
 ## Citation
 

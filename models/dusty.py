@@ -28,7 +28,7 @@ class GumbelSigmoid(nn.Module):
         self.fixed_noise = None
 
     def logistic_noise(self, logits):
-        B, C, H, W = logits.shape
+        B, _, H, W = logits.shape
         shape = (B, 1, H, W) if self.pixelwise else (B, 1, 1, 1)
         U1 = torch.rand(*shape, device=logits.device)
         U2 = torch.rand_like(U1)
@@ -44,10 +44,11 @@ class GumbelSigmoid(nn.Module):
 
     def forward(self, logits, threshold: float = 0.5):
         if self.fixed_noise is None:
-            logits += self.logistic_noise(logits)
+            logits = logits + self.logistic_noise(logits)
         else:
             B, C, H, W = logits.shape
-            logits += self.fixed_noise.expand(B, -1, -1, -1)
+            logits = logits + self.fixed_noise.expand(B, -1, -1, -1)
+
         mask_soft = self.sigmoid_with_temperature(logits)
 
         if self.hard:

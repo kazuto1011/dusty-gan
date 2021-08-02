@@ -1,20 +1,25 @@
-name: dusty-gan
+name: dusty-gan-2
 dependencies:
-  - cudatoolkit=11.0
+  - ipython
   - matplotlib
-  - python=3.7
-  - pytorch::pytorch=1.7.1
-  - pytorch::torchvision
+  - nvidia::cudatoolkit=11.1
+  - pip
+  - python=3.8
+  - pytorch::pytorch=1.8.1
+  - pytorch::torchvision>=0.8.0
   - tqdm
   - pip:
-    - black
-    - hydra-core
-    - hydra_colorlog
-    - joblib
-    - mypy
-    - omegaconf
-    - opencv-python
-    - scikit-learn
-    - tensorflow
-    - numba
-    - psutil
+      - black
+      - einops
+      - hydra_colorlog
+      - hydra-core
+      - joblib
+      - kornia
+      - mypy
+      - numba
+      - omegaconf
+      - opencv-python
+      - pandas
+      - scikit-learn
+      - streamlit
+      - tensorflow

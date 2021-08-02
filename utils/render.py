@@ -1,3 +1,4 @@
+import kornia
 import matplotlib
 import matplotlib.cm as cm
 import numba
@@ -5,90 +6,122 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from utils import denorm_range
-from utils.geometry import estimate_surface_normal
 
-
-@numba.jit
-def scatter(array, index, value, mask):
-    B = array.shape[0]
-    for i in range(B):
-        for (x, y), v, m in zip(index[i], value[i], mask[i]):
-            if m:
-                # x in height and y in width
-                # lidar coords to image coords
-                array[i, -x, -y] = v
-    return array
-
-
-def colorize(tensor, cmap="turbo", vmax=0.4):
-    assert tensor.ndim == 2
+def colorize(tensor, cmap="turbo", vmax=1.0):
+    assert tensor.ndim == 2, "got {}".format(tensor.ndim)
     normalizer = matplotlib.colors.Normalize(vmin=0.0, vmax=vmax)
     mapper = cm.ScalarMappable(norm=normalizer, cmap=cmap)
     tensor = mapper.to_rgba(tensor)[..., :3]
     return tensor
 
 
-def make_bev(points, normals, L=512, zoom=3.0, R=None):
-    B, _, _, _ = points.shape
+def render_point_clouds(
+    xyz,
+    normals,
+    L=512,
+    R=None,
+    t=None,
+    focal_length=1.0,
+):
+    xyz[..., 2] *= -1
 
-    points = points.flatten(2).transpose(1, 2)  # B,N,3
+    # extrinsic parameters
     if R is not None:
-        points = points @ R
-    points = denorm_range(points * zoom)
-    points = points.detach().cpu().numpy()
-    points = np.int32(points[..., :2] * L)
+        assert R.shape[-2:] == (3, 3)
+        xyz = xyz @ R
+    if t is not None:
+        assert t.shape[-1:] == (3,)
+        xyz += t
 
-    mask = (0 < points) & (points < L - 1)
-    mask = np.logical_and.reduce(mask, axis=2, keepdims=True)
+    B, N, _ = xyz.shape
+    device = xyz.device
 
-    normals = normals.flatten(2).transpose(1, 2)  # B,N,3
-    normals = normals.detach().cpu().numpy()
-    normals *= mask
+    # intrinsic parameters
+    K = torch.eye(3, device=device)
+    K[0, 0] = focal_length  # fx
+    K[1, 1] = focal_length  # fy
+    K[0, 2] = 0.5  # cx, xyz in [-1,1]
+    K[1, 2] = 0.5  # cy
+    K = K[None]
 
-    bev = np.ones((B, L, L, 3))  # white background
-    bev = scatter(bev, points, normals, mask)
-    bev = torch.from_numpy(bev.transpose(0, 3, 1, 2))
-    # morphological erosion for visual purpose
-    bev = -F.max_pool2d(-bev, kernel_size=3, stride=1)
+    # project 3d points onto the image plane
+    uv = kornia.geometry.project_points(xyz, K)
+
+    uv = uv * L
+    mask = (0 < uv) & (uv < L - 1)
+    mask = torch.logical_and(mask[..., [0]], mask[..., [1]])
+
+    # normals = normals.flatten(2).transpose(1, 2)  # B,N,3
+    normals = normals * mask
+
+    # z-buffering
+    uv = L - uv
+    depth = torch.norm(xyz, p=2, dim=-1, keepdim=True)  # B,N,1
+    weight = 1.0 / torch.exp(3.0 * depth)
+    weight *= (depth > 1e-8).detach()
+    bev = bilinear_rasterizer(uv, weight * normals, (L, L))
+    bev /= bilinear_rasterizer(uv, weight, (L, L)) + 1e-8
     return bev
 
 
-def make_normal(xyz):
-    normals = -estimate_surface_normal(xyz, mode="mean")
-    normals[normals != normals] = 0.0
-    normals = denorm_range(normals).clamp_(0.0, 1.0)
-    return normals
+def bilinear_rasterizer(coords, values, out_shape):
+    """
+    https://github.com/VCL3D/SphericalViewSynthesis/blob/master/supervision/splatting.py
+    """
 
+    # B,N,C = values.shape
+    # B,N,2 = coords.shape
 
-def euler_angles_to_rotation_matrix(theta):
-    R_x = torch.tensor(
-        [
-            [1, 0, 0],
-            [0, torch.cos(theta[0]), -torch.sin(theta[0])],
-            [0, torch.sin(theta[0]), torch.cos(theta[0])],
-        ],
-        device=theta.device,
-    )
+    B, _, C = values.shape
+    H, W = out_shape
+    device = coords.device
 
-    R_y = torch.tensor(
-        [
-            [torch.cos(theta[1]), 0, torch.sin(theta[1])],
-            [0, 1, 0],
-            [-torch.sin(theta[1]), 0, torch.cos(theta[1])],
-        ],
-        device=theta.device,
-    )
+    h = coords[..., [0]].expand(-1, -1, C)
+    w = coords[..., [1]].expand(-1, -1, C)
 
-    R_z = torch.tensor(
-        [
-            [torch.cos(theta[2]), -torch.sin(theta[2]), 0],
-            [torch.sin(theta[2]), torch.cos(theta[2]), 0],
-            [0, 0, 1],
-        ],
-        device=theta.device,
-    )
+    # Four adjacent pixels
+    h_t = torch.floor(h)
+    h_b = h_t + 1  # == torch.ceil(h)
+    w_l = torch.floor(w)
+    w_r = w_l + 1  # == torch.ceil(w)
 
-    matrices = [R_x, R_y, R_z]
-    R = torch.mm(matrices[2], torch.mm(matrices[1], matrices[0]))
-    return R
+    h_t_safe = torch.clamp(h_t, 0.0, H - 1)
+    h_b_safe = torch.clamp(h_b, 0.0, H - 1)
+    w_l_safe = torch.clamp(w_l, 0.0, W - 1)
+    w_r_safe = torch.clamp(w_r, 0.0, W - 1)
+
+    weight_h_t = (h_b - h) * (h_t == h_t_safe).detach().float()
+    weight_h_b = (h - h_t) * (h_b == h_b_safe).detach().float()
+    weight_w_l = (w_r - w) * (w_l == w_l_safe).detach().float()
+    weight_w_r = (w - w_l) * (w_r == w_r_safe).detach().float()
+
+    # Bilinear weights
+    weight_tl = weight_h_t * weight_w_l
+    weight_tr = weight_h_t * weight_w_r
+    weight_bl = weight_h_b * weight_w_l
+    weight_br = weight_h_b * weight_w_r
+
+    # For stability
+    weight_tl *= (weight_tl >= 1e-3).detach().float()
+    weight_tr *= (weight_tr >= 1e-3).detach().float()
+    weight_bl *= (weight_bl >= 1e-3).detach().float()
+    weight_br *= (weight_br >= 1e-3).detach().float()
+
+    values_tl = values * weight_tl  # (B,N,C)
+    values_tr = values * weight_tr
+    values_bl = values * weight_bl
+    values_br = values * weight_br
+
+    indices_tl = (w_l_safe + W * h_t_safe).long()
+    indices_tr = (w_r_safe + W * h_t_safe).long()
+    indices_bl = (w_l_safe + W * h_b_safe).long()
+    indices_br = (w_r_safe + W * h_b_safe).long()
+
+    render = torch.zeros(B, H * W, C).to(device)
+    render.scatter_add_(dim=1, index=indices_tl, src=values_tl)
+    render.scatter_add_(dim=1, index=indices_tr, src=values_tr)
+    render.scatter_add_(dim=1, index=indices_bl, src=values_bl)
+    render.scatter_add_(dim=1, index=indices_br, src=values_br)
+    render = render.reshape(B, H, W, C).permute(0, 3, 1, 2)
+
+    return render

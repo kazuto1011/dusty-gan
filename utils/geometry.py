@@ -1,13 +1,45 @@
-# re-implemented the following codes with pytorch:
-# https://github.com/wkentaro/morefusion/blob/master/morefusion/geometry/estimate_pointcloud_normals.py
-# https://github.com/jmccormac/pySceneNetRGBD/blob/master/calculate_surface_normals.py
-
 import torch
 import torch.nn.functional as F
 
 
+def euler_angles_to_rotation_matrix(theta):
+    R_x = torch.tensor(
+        [
+            [1, 0, 0],
+            [0, torch.cos(theta[0]), -torch.sin(theta[0])],
+            [0, torch.sin(theta[0]), torch.cos(theta[0])],
+        ],
+        device=theta.device,
+    )
+
+    R_y = torch.tensor(
+        [
+            [torch.cos(theta[1]), 0, torch.sin(theta[1])],
+            [0, 1, 0],
+            [-torch.sin(theta[1]), 0, torch.cos(theta[1])],
+        ],
+        device=theta.device,
+    )
+
+    R_z = torch.tensor(
+        [
+            [torch.cos(theta[2]), -torch.sin(theta[2]), 0],
+            [torch.sin(theta[2]), torch.cos(theta[2]), 0],
+            [0, 0, 1],
+        ],
+        device=theta.device,
+    )
+
+    matrices = [R_x, R_y, R_z]
+    R = torch.mm(matrices[2], torch.mm(matrices[1], matrices[0]))
+    return R
+
+
 def estimate_surface_normal(points, d=2, mode="closest"):
-    # estimates a surface normal map from coordinated point clouds
+    # estimate surface normal from coordinated point clouds
+    # re-implemented the following codes with pytorch:
+    # https://github.com/wkentaro/morefusion/blob/master/morefusion/geometry/estimate_pointcloud_normals.py
+    # https://github.com/jmccormac/pySceneNetRGBD/blob/master/calculate_surface_normals.py
 
     assert points.dim() == 4, "(B,3,H,W) tensor is expected"
     B, C, H, W = points.shape
@@ -70,7 +102,7 @@ def estimate_surface_normal(points, d=2, mode="closest"):
     if mode == "closest":
         # find the closest neighbor pair
         diff = torch.norm(points1 - anchors, dim=4)
-        diff += torch.norm(points2 - anchors, dim=4)
+        diff = diff + torch.norm(points2 - anchors, dim=4)
         i = torch.argmin(diff, dim=1)  # (B,H,W)
         # get normals by cross product
         anchors = anchors[b, 0, h, w]  # (B,H,W,3)
@@ -88,42 +120,7 @@ def estimate_surface_normal(points, d=2, mode="closest"):
     else:
         raise NotImplementedError(mode)
 
-    normals /= torch.norm(normals, dim=3, keepdim=True)
+    normals = normals / (torch.norm(normals, dim=3, keepdim=True) + 1e-8)
     normals = normals.permute(0, 3, 1, 2)  # (B,3,H,W)
 
     return normals
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    import numpy as np
-
-    # sphere
-    B, C, H, W = (5, 3, 64, 256)
-    h = torch.linspace(0.5, -0.5, H) * np.pi
-    h = h.view(1, 1, H, 1).expand(B, 1, H, W)
-    w = torch.linspace(-0.5, 0.5, W) * 2 * np.pi
-    w = w.view(1, 1, 1, W).expand(B, 1, H, W)
-    g = torch.cat([h, w], dim=1)
-    c, s = torch.cos(g), torch.sin(g)
-    x = c[:, [0]] * c[:, [1]]
-    y = c[:, [0]] * s[:, [1]]
-    z = s[:, [0]]
-    points = torch.cat([x, y, z], dim=1)
-
-    normal = estimate_surface_normal(points, mode="mean")
-    normal[normal != normal] = 0.0
-
-    normalize = lambda x: (x + 1) / 2
-    to_numpy = lambda x: x.detach().cpu().numpy().transpose(1, 2, 0)
-
-    fig, ax = plt.subplots(4, 1)
-    ax[0].imshow(to_numpy(normalize(points)[0, [0]]))
-    ax[0].set_title("x")
-    ax[1].imshow(to_numpy(normalize(points)[0, [1]]))
-    ax[1].set_title("y")
-    ax[2].imshow(to_numpy(normalize(points)[0, [2]]))
-    ax[2].set_title("z")
-    ax[3].imshow(to_numpy(normalize(normal)[0]))
-    ax[3].set_title("normal")
-    plt.show()

@@ -97,19 +97,21 @@ class GradientPenalty(nn.Module):
 
     def forward(self, outputs, inputs):
 
-        assert inputs.requires_grad == True
+        for i in inputs:
+            i.requires_grad == True
+
         outputs = outputs.sum()
 
-        (grads,) = torch.autograd.grad(
+        grads = torch.autograd.grad(
             outputs=outputs,
             inputs=inputs,
             create_graph=True,
             only_inputs=True,
         )
 
-        grads = grads.flatten(start_dim=1)
+        grads = torch.cat([g.flatten(start_dim=1) for g in grads], dim=1)
         if self.mode == "zero":
-            penalty = 0.5 * (grads ** 2).sum(dim=1).mean()
+            penalty = 0.5 * (grads ** 2).sum(dim=[1, 2, 3]).mean()
         elif self.mode == "one":
             penalty = ((grads.norm(p=2, dim=1) - 1) ** 2).mean()
 

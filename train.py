@@ -1,24 +1,31 @@
 import os
-import warnings
+import tempfile
 
 import hydra
-import psutil
 import torch
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from hydra.utils import get_original_cwd
 from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
 from torchvision.utils import make_grid
 from tqdm import tqdm
 
-from trainers import dcgan_trainer
-from utils import denorm_range
-from utils.render import colorize, make_bev, make_normal
+import utils
+from trainers import dcgan_amp
+from utils.render import colorize, render_point_clouds
 
-warnings.simplefilter("ignore")
+try:
+    import wandb
+
+    publish_wandb = True
+except:
+    publish_wandb = False
+
+scale = 1 / 0.4  # for visibility
 
 # save images to tensorboard
-def save_img(writer, tensor, tag, step, color=True):
+def log_imgs(writer, tensor, tag, step, color=True):
     grid = make_grid(tensor.detach(), nrow=4)
     grid = grid.cpu().numpy()  # CHW
     if color:
@@ -27,17 +34,21 @@ def save_img(writer, tensor, tag, step, color=True):
     writer.add_image(tag, grid, step)
 
 
-def main_worker(gpu, cfg):
+def main_worker(gpu, cfg, temp_dir):
     torch.backends.cudnn.enabled = True
     torch.backends.cudnn.benchmark = True
 
     ngpus = torch.cuda.device_count()
 
     # setup for distributed training
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
-    dist.init_process_group(backend=cfg.dist_backend, world_size=ngpus, rank=gpu)
-    print("init device {}: {}".format(gpu, torch.cuda.get_device_name(gpu)))
+    init_file = os.path.abspath(os.path.join(temp_dir, ".torch_distributed_init"))
+    torch.distributed.init_process_group(
+        init_method=f"file://{init_file}",
+        backend=cfg.dist_backend,
+        world_size=ngpus,
+        rank=gpu,
+    )
+    print("rank {}: {} gpu".format(gpu, torch.cuda.get_device_name(gpu)))
 
     # determine the batchsize for this worker
     assert cfg.solver.batch_size % ngpus == 0
@@ -55,95 +66,89 @@ def main_worker(gpu, cfg):
     )
 
     # setup trainer
-    if cfg.trainer == "dcgan":
-        trainer = dcgan_trainer.Trainer(cfg, local_cfg)
-    else:
-        raise NotImplementedError
+    trainer = dcgan_amp.Trainer(cfg, local_cfg)
 
     total_img = cfg.solver.total_kimg * 1000
     total_iteration = int(total_img / cfg.solver.batch_size)
-    current_img = lambda i: int(i * cfg.solver.batch_size)
-    best_score = 1e10
+    iteration_to_imgs = lambda i: int(i * cfg.solver.batch_size)
 
     if dist.get_rank() == 0:
+        # init wandb
+        if publish_wandb and cfg.publish_wandb:
+            wandb.init(
+                project="dusty-gan-iros2021",
+                config=OmegaConf.to_container(cfg),
+            )
+            wandb.tensorboard.patch(save=False)
         # init tensorboatd
         writer = SummaryWriter()
         # real data
-        inv, _ = trainer.fetch_reals(next(trainer.loader))
-        inv = denorm_range(inv).clamp_(0, 1)
-        xyz = trainer.lidar.inv_depth_to_points(inv)
-        normals = make_normal(xyz)
-        bev = make_bev(xyz, normals)
-        save_img(writer, inv, "real/inv", 1)
-        save_img(writer, normals, "real/normal", 1, False)
-        save_img(writer, bev, "real/bev", 1, False)
+        inv_real, mask_real = trainer.fetch_reals(next(trainer.loader))
+        real = trainer.postprocess({"depth": inv_real, "mask": mask_real})
+        real_aug = trainer.postprocess({"depth": trainer.A(inv_real)})
+        bev = render_point_clouds(
+            utils.flatten(real["points"]),
+            utils.flatten(real["normals"]),
+            t=torch.tensor([0, 0, 0.5], device=trainer.device),
+        )
+        log_imgs(writer, real["depth"] * scale, "real/inv", 1)
+        log_imgs(writer, real_aug["depth"] * scale, "real/inv_aug", 1)
+        log_imgs(writer, real["normals"], "real/normal", 1, False)
+        log_imgs(writer, bev, "real/bev", 1, False)
+
+        print("iteration start:", trainer.start_iteration + 1)
+        print("iteration total:", total_iteration)
 
     # training loop
     for i in tqdm(
-        range(1, total_iteration + 1),
+        range(trainer.start_iteration + 1, total_iteration + 1),
         desc="iteration",
         dynamic_ncols=True,
         disable=not dist.get_rank() == 0,
     ):
         # training
         scalars = trainer.step(i)
+        step = iteration_to_imgs(i)
 
         # logging
         if dist.get_rank() == 0:
 
-            step = current_img(i)
-
-            # save scalars
+            # log scalars
             if i % cfg.solver.checkpoint.save_stats == 0:
                 # training stats
                 for key, scalar in scalars.items():
                     writer.add_scalar(key, scalar, step)
-                # system stats
-                memory = psutil.virtual_memory().used / 1024 ** 3
-                writer.add_scalar("system/cpu/ram (GB)", memory, step)
-                memory = psutil.swap_memory().used / 1024 ** 3
-                writer.add_scalar("system/cpu/swap (GB)", memory, step)
-                usage = psutil.cpu_percent()
-                writer.add_scalar("system/cpu/utilization (%)", usage, step)
-                for j in range(torch.cuda.device_count()):
-                    device = torch.cuda.device(j)
-                    memory = torch.cuda.memory_allocated(device) / 1024 ** 3
-                    writer.add_scalar(f"system/gpu{j}/allocated (GB)", memory, step)
-                    memory = torch.cuda.memory_reserved(device) / 1024 ** 3
-                    writer.add_scalar(f"system/gpu{j}/reserved (GB)", memory, step)
 
-            # save images
+            # log images
             if i % cfg.solver.checkpoint.save_image == 0:
-                synth = trainer.generate()
-                if "depth" in synth:
-                    inv = synth["depth"]
-                    inv = denorm_range(inv).clamp_(0, 1)
-                    xyz = trainer.lidar.inv_depth_to_points(inv)
-                    normals = make_normal(xyz)
-                    bev = make_bev(xyz, normals)
-                    save_img(writer, inv, "synth/inv", step)
-                    save_img(writer, normals, "synth/normal", step, False)
-                    save_img(writer, bev, "synth/bev", step, False)
-                if "depth_orig" in synth:
-                    inv = synth["depth_orig"]
-                    inv = denorm_range(inv).clamp_(0, 1)
-                    save_img(writer, inv, "synth/inv/orig", step)
-                if "confidence" in synth:
-                    conf = torch.sigmoid(synth["confidence"])
+                out = trainer.generate()
+                if "depth" in out:
+                    bev = render_point_clouds(
+                        utils.flatten(out["points"]),
+                        utils.flatten(out["normals"]),
+                        t=torch.tensor([0, 0, 0.5], device=trainer.device),
+                    )
+                    log_imgs(writer, out["depth"] * scale, "synth/inv", step)
+                    log_imgs(writer, out["normals"], "synth/normal", step, False)
+                    log_imgs(writer, bev, "synth/bev", step, False)
+                if "depth_orig" in out:
+                    log_imgs(writer, out["depth_orig"] * scale, "synth/inv/orig", step)
+                if "confidence" in out:
+                    conf = out["confidence"]
                     if conf.shape[1] == 2:
-                        save_img(writer, conf[:, [0]], "synth/confidence/pix", step)
-                        save_img(writer, conf[:, [1]], "synth/confidence/img", step)
+                        log_imgs(writer, conf[:, [0]], "synth/confidence/pix", step)
+                        log_imgs(writer, conf[:, [1]], "synth/confidence/img", step)
                     elif conf.shape[1] == 1:
-                        save_img(writer, conf[:, [0]], "synth/confidence/pix", step)
-                if "mask" in synth:
-                    mask = synth["mask"]
+                        log_imgs(writer, conf[:, [0]], "synth/confidence", step)
+                if "mask" in out:
+                    mask = out["mask"]
                     if mask.shape[1] == 2:
-                        save_img(writer, mask[:, [0]], "synth/mask/pix", step, False)
-                        save_img(writer, mask[:, [1]], "synth/mask/img", step, False)
-                        mask = mask[:, [0]] * mask[:, [1]]
-                        save_img(writer, mask, "synth/mask", step, False)
+                        log_imgs(writer, mask[:, [0]], "synth/mask/pix", step, False)
+                        log_imgs(writer, mask[:, [1]], "synth/mask/img", step, False)
+                        mask = torch.prod(mask, dim=1, keepdim=True)
+                        log_imgs(writer, mask, "synth/mask", step, False)
                     elif mask.shape[1] == 1:
-                        save_img(writer, mask, "synth/mask", step, False)
+                        log_imgs(writer, mask, "synth/mask", step, False)
 
             # validation
             if i % cfg.solver.checkpoint.test == 0:
@@ -151,29 +156,34 @@ def main_worker(gpu, cfg):
                 for key, scalar in scores.items():
                     writer.add_scalar("score/" + key, scalar, step)
 
-                if scores["1-nn-accuracy-cd"] <= best_score:
-                    best_score = scores["1-nn-accuracy-cd"]
-                    trainer.save_models("best", int(step))
-
             # save models
             if i % cfg.solver.checkpoint.save_model == 0:
-                suffix = "{:010d}".format(int(step))
-                trainer.save_models(suffix, int(step))
+                trainer.save_models("{:010d}".format(int(step)), int(step))
 
     # save the final model
     if dist.get_rank() == 0:
-        step = current_img(total_iteration)
-        suffix = "{:010d}".format(int(step))
-        trainer.save_models(suffix, int(step))
+        step = iteration_to_imgs(total_iteration)
+        trainer.save_models("{:010d}".format(int(step)), int(step))
+
+    if publish_wandb and cfg.publish_wandb:
+        wandb.finish()
 
 
-@hydra.main(config_path="configs/config.yaml")
+@hydra.main(config_path="configs", config_name="config")
 def main(cfg):
 
-    print(cfg.pretty())
+    print(OmegaConf.to_yaml(cfg))
 
+    # path settings
     os.makedirs("models", exist_ok=True)
-    mp.spawn(main_worker, args=(cfg,), nprocs=torch.cuda.device_count())
+    if cfg.dataset.root[0] != "/":
+        cfg.dataset.root = os.path.join(get_original_cwd(), cfg.dataset.root)
+    if cfg.resume is not None and cfg.resume[0] != "/":
+        cfg.resume = os.path.join(get_original_cwd(), cfg.resume)
+
+    # run distributed training
+    with tempfile.TemporaryDirectory() as temp_dir:
+        mp.spawn(main_worker, args=(cfg, temp_dir), nprocs=torch.cuda.device_count())
 
 
 if __name__ == "__main__":

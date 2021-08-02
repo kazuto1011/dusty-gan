@@ -1,23 +1,21 @@
 cuda: true
-num_workers: 4
+num_workers: 8
 pin_memory: true
 resume: null
+enable_amp: true
 
 dist_backend: nccl
 seed: null
 multiprocessing_distributed: true
-publish_wandb: true
+publish_wandb: false
 
 defaults:
   - dataset: kitti_odometry
   - model: dusty1_dcgan_eqlr
   - solver: nsgan
 
-  - hydra/job_logging: colorlog
-  - hydra/hydra_logging: colorlog
-
 hydra:
   run:
-    dir: outputs/${hydra.job.override_dirname}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: outputs/logs/dataset=${hydra.runtime.choices.dataset}/model=${hydra.runtime.choices.model}/solver=${hydra.runtime.choices.solver}/${now:%Y-%m-%d}/${now:%H-%M-%S}
   sweep:
-    dir: outputs/${hydra.job.override_dirname}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    dir: outputs/logs/dataset=${hydra.runtime.choices.dataset}/model=${hydra.runtime.choices.model}/solver=${hydra.runtime.choices.solver}/${now:%Y-%m-%d}/${now:%H-%M-%S}

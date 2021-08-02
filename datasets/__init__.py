@@ -9,19 +9,19 @@ def define_dataset(cfg, phase: str = "train", modality=["depth"]):
             shape=cfg.shape,
             min_depth=cfg.min_depth,
             max_depth=cfg.max_depth,
-            flip=cfg.flip,
+            flip=cfg.flip and phase == "train",
             modality=modality,
         )
-    elif cfg.name == "mpo_sparse":
-        dataset = mpo.MPOSparse(
+    elif cfg.name == "sparse_mpo":
+        dataset = mpo.SparseMPO(
             root=cfg.root,
             split=phase,
             shape=cfg.shape,
             min_depth=cfg.min_depth,
             max_depth=cfg.max_depth,
-            flip=cfg.flip,
+            flip=cfg.flip and phase == "train",
             modality=modality,
         )
     else:
-        raise NotImplementedError
+        raise NotImplementedError(cfg.name)
     return dataset

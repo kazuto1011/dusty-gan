@@ -1,17 +1,17 @@
-model:
-  gen:
-    arch: dusty2/dcgan_eqlr
-    in_ch: 512
-    out_ch: {'depth': 1, 'confidence': 2}
-    ch_base: 64
-    ch_max: 512
-    drop_const: -1
-    shape: none
-    tau: 1
-  dis:
-    arch: dcgan_eqlr
-    in_ch: 1
-    ch_base: 64
-    ch_max: 512
-    shape: none
+gen:
+  arch: dusty2/dcgan_eqlr
+  in_ch: 512
+  out_ch: {'depth': 1, 'confidence': 2}
+  ch_base: 64
+  ch_max: 512
+  drop_const: -1
+  shape: none
+  tau: 1
+dis:
+  arch: dcgan_eqlr
+  in_ch: 1
+  ch_base: 64
+  ch_max: 512
+  shape: none
+ring: true
 trainer: dcgan

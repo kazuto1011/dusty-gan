@@ -50,16 +50,9 @@ def rand_contrast(x, band=0.5, p=1.0):
     return y
 
 
-def rand_translation(x, ratio=(0.0, 1.0 / 8.0), p=1.0):
-    B, C, H_orig, W_orig = x.shape
-    device = x.device
-
-    pad_w = W_orig // 2
-    pad_h = H_orig // 2
-    x = F.pad(x, (pad_w, pad_w, 0, 0), "circular")
-    x = F.pad(x, (0, 0, pad_h, pad_h), "constant")
-
+def rand_translation(x, ratio=(1.0 / 8.0, 1.0 / 8.0), p=1.0):
     B, C, H, W = x.shape
+    device = x.device
 
     ratio_h, ratio_w = _pair(ratio)
     shift_h, shift_w = int(H * ratio_h / 2 + 0.5), int(W * ratio_w / 2 + 0.5)
@@ -70,19 +63,19 @@ def rand_translation(x, ratio=(0.0, 1.0 / 8.0), p=1.0):
         torch.arange(H, dtype=torch.long, device=device),
         torch.arange(W, dtype=torch.long, device=device),
     )
-    grid_h = torch.clamp(grid_h + translation_h + 1, 0, H + 1)
-    grid_w = torch.clamp(grid_w + translation_w + 1, 0, W + 1)
-    x_pad = F.pad(x, [1, 1, 1, 1, 0, 0, 0, 0])
+    x_pad = F.pad(x, [0, 0, 1, 1, 0, 0, 0, 0])  # pad top and left
+    grid_h = torch.clamp(grid_h + translation_h + 1, min=0, max=H + 1)
+    grid_w = grid_w + translation_w
+    grid_w = grid_w % (W - 1)  # horizontal circulation
     y = (
         x_pad.permute(0, 2, 3, 1)
         .contiguous()[grid_batch, grid_h, grid_w]
         .permute(0, 3, 1, 2)
+        .contiguous()
     )
 
     mask = torch.empty(B, device=device).bernoulli_(p=p).bool()
     y[~mask] = x[~mask]
-
-    y = y[:, :, pad_h : pad_h + H_orig, pad_w : pad_w + W_orig]
     return y
 
 
