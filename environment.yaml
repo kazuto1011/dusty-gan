@@ -1,4 +1,4 @@
-name: dusty-gan-2
+name: dusty-gan
 dependencies:
   - ipython
   - matplotlib
