@@ -1,6 +1,6 @@
 # Learning to Drop Points for LiDAR Scan Synthesis
 
-*From left to right: a learned depth map, a measurabitlity map for sampling pixels, and a sampled depth map*
+*From left to right: a learned depth map, a measurability map for sampling pixels, and a sampled depth map*
 <img src='https://user-images.githubusercontent.com/9032347/127803595-6e378bab-f709-4476-a528-73460a503e76.gif' width='100%' style='image-rendering: pixelated;'>
 
 **Learning to Drop Points for LiDAR Scan Synthesis**<br>
@@ -58,7 +58,7 @@ outputs/logs
                         └── <TENSORBOARD FILES> # logged losses, scores, and images
 ```
 
-To monitor losses, scores and images, run the following command to launch TensorBoard.
+To monitor losses, scores, and images, run the following command to launch TensorBoard.
 
 ```sh
 $ tensorboard --logdir outputs/logs
