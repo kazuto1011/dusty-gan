@@ -27,7 +27,7 @@ $ conda activate dusty-gan
 
 ## Datasets
 
-[Instruction for KITTI Odometry](datasets/README)
+[Instruction for KITTI Odometry](datasets/README.md)
 
 ## Training
 
