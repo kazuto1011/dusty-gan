@@ -101,10 +101,11 @@ $ streamlit run demo.py $MODEL_PATH $CONFIG_PATH
 If you find this code helpful, please cite our paper:
 
 ```bibtex
-@article{nakashima2021learning,
-    title   = {Learning to Drop Points for LiDAR Scan Synthesis},
-    author  = {Nakashima, Kazuto and Kurazume, Ryo},
-    journal = {arXiv preprint arXiv:2102.11952},
-    year    = 2021
+@inproceedings{nakashima2021learning,
+	title        = {Learning to Drop Points for LiDAR Scan Synthesis},
+	author       = {Nakashima, Kazuto and Kurazume, Ryo},
+	booktitle    = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+	pages        = {222--229},
+	year         = 2021
 }
 ```
