@@ -1,18 +1,20 @@
-# Learning to Drop Points for LiDAR Scan Synthesis
+# Learning to Drop Points for LiDAR Scan Synthesis (IROS 2021)
 
-*From left to right: a learned depth map, a measurability map for sampling pixels, and a sampled depth map*
-<img src='https://user-images.githubusercontent.com/9032347/127803595-6e378bab-f709-4476-a528-73460a503e76.gif' width='100%' style='image-rendering: pixelated;'>
+This repository provides the official PyTorch implementation of the following paper:
 
-**Learning to Drop Points for LiDAR Scan Synthesis**<br>
-[Kazuto Nakashima](https://kazuto1011.github.io/) and Ryo Kurazume<br>
+**[Learning to Drop Points for LiDAR Scan Synthesis](https://arxiv.org/abs/2102.11952)**<br>
+[Kazuto Nakashima](https://kazuto1011.github.io/) and [Ryo Kurazume](https://robotics.ait.kyushu-u.ac.jp/kurazume/en/)<br>
 In IROS 2021<br>
-[[arXiv]](https://arxiv.org/abs/2102.11952)
 
-**Overview:** We propose a noise-aware GAN for 3D LiDAR data, which learns inverse depth and measurement uncertainty on 2D representation from a collection of real LiDAR data involving dropout noises.
+**Overview:** 3D LiDARs often involve missing points due to the laser's reflectivity, which emerge as dropout noises on projected 2D space (aka spherical map). In this work, we propose DUSty, a noise-aware GAN that models 3D LiDAR data by learning the underlying <u>d</u>epth and reflective <u>u</u>ncertainty as 2D <u>sty</u>le codes.
 
 ![](docs/model.svg)
 
-**Reconstruction:** A trained generator can be used as a scene prior to restore LiDAR data.
+**Generation:** The learned depth map (left), the measurability map for simulating the point-drops (center), and the final depth map (right).
+
+<img src='https://user-images.githubusercontent.com/9032347/127803595-6e378bab-f709-4476-a528-73460a503e76.gif' width='100%' style='image-rendering: pixelated;'>
+
+**Reconstruction:** The trained generator can be used as a scene prior to restore LiDAR data.
 
 <img src='docs/example.svg' width='100%' style='image-rendering: pixelated;'>
 
@@ -27,7 +29,15 @@ $ conda activate dusty-gan
 
 ## Datasets
 
-[Instruction for KITTI Odometry](datasets/README.md)
+Please follow [the instruction for KITTI Odometry](datasets/README.md). This step produces the azimuth/elevation coordinates (`angles.pt`) aligned with the image grid, which are required for all the following steps.
+
+## Pretrained Models
+
+|    Dataset     |      LiDAR       |  Method  |                         Weight                          |                      Configuration                      |
+| :------------: | :--------------: | :------: | :-----------------------------------------------------: | :-----------------------------------------------------: |
+| KITTI Odometry | Velodyne HDL-64E | Baseline | [URL](https://github.com/kazuto1011/dusty-gan/releases) | [URL](https://github.com/kazuto1011/dusty-gan/releases) |
+|                |                  | DUSty-I  | [URL](https://github.com/kazuto1011/dusty-gan/releases) | [URL](https://github.com/kazuto1011/dusty-gan/releases) |
+|                |                  | DUSty-II | [URL](https://github.com/kazuto1011/dusty-gan/releases) | [URL](https://github.com/kazuto1011/dusty-gan/releases) |
 
 ## Training
 
@@ -94,7 +104,10 @@ We used `0.008` for KITTI.
 ```sh
 $ streamlit run demo.py $MODEL_PATH $CONFIG_PATH
 ```
-![](docs/streamlit.png)
+
+|               Synthesis                |             Reconstruction             |
+| :------------------------------------: | :------------------------------------: |
+| ![](docs/dusty-gan_demo_synthesis.png) | ![](docs/dusty-gan_demo_inversion.png) |
 
 ## Citation
 
@@ -102,10 +115,10 @@ If you find this code helpful, please cite our paper:
 
 ```bibtex
 @inproceedings{nakashima2021learning,
-	title        = {Learning to Drop Points for LiDAR Scan Synthesis},
-	author       = {Nakashima, Kazuto and Kurazume, Ryo},
-	booktitle    = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
-	pages        = {222--229},
-	year         = 2021
+    title     = {Learning to Drop Points for LiDAR Scan Synthesis},
+    author    = {Nakashima, Kazuto and Kurazume, Ryo},
+    booktitle = {IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS)},
+    pages     = {222--229},
+    year      = 2021
 }
 ```
