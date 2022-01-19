@@ -266,10 +266,10 @@ def set_inversion_options(n_max):
 def synthesis():
     cfg, G, lidar, device = setup_synthesis()
 
-    with st.sidebar.beta_expander("run options"):
+    with st.sidebar.expander("run options"):
         num_samples, latent_type = set_synthesis_options()
 
-    with st.sidebar.beta_expander("view options"):
+    with st.sidebar.expander("view options"):
         R, t, cmap = set_view_options(device)
 
     run_synthesis = st.button("run")
@@ -325,7 +325,7 @@ def synthesis():
         bev_alpha = torch.all(bev != 0.0, dim=1, keepdim=True).float()
         export.append(("point clouds", torch.cat([bev, bev_alpha], dim=1)))
 
-        cols = st.beta_columns(num_samples)
+        cols = st.columns(num_samples)
 
         for i in range(num_samples):
             with cols[i]:
@@ -347,7 +347,7 @@ def inversion():
         return
 
     # options
-    with st.sidebar.beta_expander("run options"):
+    with st.sidebar.expander("run options"):
         n, corruption, distance, num_step = set_inversion_options(n_max=len(dataset))
 
         num_code = st.select_slider(
@@ -365,7 +365,7 @@ def inversion():
             _, feature_shape = feature_shapes[layer_name]
             _, feature_ch, _, _ = feature_shape  # B,C,H,W
 
-    with st.sidebar.beta_expander("view options"):
+    with st.sidebar.expander("view options"):
         R, t, cmap = set_view_options(device)
 
     # stylegan2 settings
@@ -408,7 +408,7 @@ def inversion():
     run_inversion = st.button("run")
     progress_title = st.text("progress")
     progress_bar = st.progress(0)
-    cols = st.beta_columns(2)
+    cols = st.columns(2)
 
     with cols[0]:
         st.text(f"target #{n}")
