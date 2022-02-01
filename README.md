@@ -6,7 +6,7 @@ This repository provides the official PyTorch implementation of the following pa
 [Kazuto Nakashima](https://kazuto1011.github.io/) and [Ryo Kurazume](https://robotics.ait.kyushu-u.ac.jp/kurazume/en/)<br>
 In IROS 2021<br>
 
-**Overview:** 3D LiDARs often involve missing points due to the laser's reflectivity, which emerge as dropout noises on projected 2D space (aka spherical map). In this work, we propose DUSty, a noise-aware GAN that models 3D LiDAR data by learning the underlying <u>d</u>epth and reflective <u>u</u>ncertainty as 2D <u>sty</u>le codes.
+**Overview:** We propose a noise-aware GAN for generative modeling of 3D LiDAR data on a projected 2D representation (aka spherical projection). Although the 2D representation has been adopted in many LiDAR processing tasks, generative modeling is non-trivial due to the discrete dropout noises caused by LiDAR’s lossy measurement. Our GAN can effectively learn the LiDAR data by representing such discrete data distribution as a composite of two modalities: an underlying complete depth and the corresponding reflective uncertainty.
 
 ![](docs/model.svg)
 
@@ -29,15 +29,19 @@ $ conda activate dusty-gan
 
 ## Datasets
 
-Please follow [the instruction for KITTI Odometry](datasets/README.md). This step produces the azimuth/elevation coordinates (`angles.pt`) aligned with the image grid, which are required for all the following steps.
+Please follow [the instruction for KITTI Odometry](datasets/README.md). This step produces the azimuth/elevation coordinates (`angles.pt`) aligned 
+with the image grid, which are required for all the following steps.
+
+| ![kitti_scene_1](https://user-images.githubusercontent.com/9032347/151912330-992a53fc-848e-42dd-a250-c3cad1834eae.gif) | ![kitti_scene_2](https://user-images.githubusercontent.com/9032347/151912335-695a8b1a-40d2-4674-803f-773de641a5a8.gif) |
+| :--------------------------------------------------------------------------------------------------------------------: | :--------------------------------------------------------------------------------------------------------------------: |
 
 ## Pretrained Models
 
-|    Dataset     |      LiDAR       |  Method  |                         Weight                          |                      Configuration                      |
-| :------------: | :--------------: | :------: | :-----------------------------------------------------: | :-----------------------------------------------------: |
-| KITTI Odometry | Velodyne HDL-64E | Baseline | [URL](https://github.com/kazuto1011/dusty-gan/releases) | [URL](https://github.com/kazuto1011/dusty-gan/releases) |
-|                |                  | DUSty-I  | [URL](https://github.com/kazuto1011/dusty-gan/releases) | [URL](https://github.com/kazuto1011/dusty-gan/releases) |
-|                |                  | DUSty-II | [URL](https://github.com/kazuto1011/dusty-gan/releases) | [URL](https://github.com/kazuto1011/dusty-gan/releases) |
+|    Dataset     |      LiDAR       |  Method  |                                               Weight                                               |                                          Configuration                                          |
+| :------------: | :--------------: | :------: | :------------------------------------------------------------------------------------------------: | :---------------------------------------------------------------------------------------------: |
+| KITTI Odometry | Velodyne HDL-64E | Baseline | [Download](https://github.com/kazuto1011/dusty-gan/releases/download/v1.0/baseline_0025000000.pth) | [Download](https://github.com/kazuto1011/dusty-gan/releases/download/v1.0/baseline_config.yaml) |
+|                |                  | DUSty-I  |  [Download](https://github.com/kazuto1011/dusty-gan/releases/download/v1.0/dusty1_0025000000.pth)  |  [Download](https://github.com/kazuto1011/dusty-gan/releases/download/v1.0/dusty1_config.yaml)  |
+|                |                  | DUSty-II |  [Download](https://github.com/kazuto1011/dusty-gan/releases/download/v1.0/dusty2_0025000000.pth)  |  [Download](https://github.com/kazuto1011/dusty-gan/releases/download/v1.0/dusty2_config.yaml)  |
 
 ## Training
 
@@ -45,7 +49,7 @@ Please use `train.py` with `dataset=`, `solver=`, and `model=` options.
 The default configurations are defined under `configs/` and can be overridden via a console ([reference](https://hydra.cc/docs/advanced/override_grammar/basic)).
 
 ```sh
-$ python train.py dataset=kitti_odometry solver=nsgan_eqlr model=dcgan_eqlr # baseline
+$ python train.py dataset=kitti_odometry solver=nsgan_eqlr model=dcgan_eqlr        # baseline
 $ python train.py dataset=kitti_odometry solver=nsgan_eqlr model=dusty1_dcgan_eqlr # DUSty-I (ours)
 $ python train.py dataset=kitti_odometry solver=nsgan_eqlr model=dusty2_dcgan_eqlr # DUSty-II (ours)
 ```
