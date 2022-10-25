@@ -2,9 +2,10 @@
 
 This repository provides the official PyTorch implementation of the following paper:
 
-**[Learning to Drop Points for LiDAR Scan Synthesis](https://arxiv.org/abs/2102.11952)**<br>
+**Learning to Drop Points for LiDAR Scan Synthesis**<br>
 [Kazuto Nakashima](https://kazuto1011.github.io/) and [Ryo Kurazume](https://robotics.ait.kyushu-u.ac.jp/kurazume/en/)<br>
 In IROS 2021<br>
+[[Project]](https://kazuto1011.github.io/dusty-gan) [[Paper]](https://arxiv.org/abs/2102.11952)
 
 **Overview:** We propose a noise-aware GAN for generative modeling of 3D LiDAR data on a projected 2D representation (aka spherical projection). Although the 2D representation has been adopted in many LiDAR processing tasks, generative modeling is non-trivial due to the discrete dropout noises caused by LiDAR’s lossy measurement. Our GAN can effectively learn the LiDAR data by representing such discrete data distribution as a composite of two modalities: an underlying complete depth and the corresponding reflective uncertainty.
 
