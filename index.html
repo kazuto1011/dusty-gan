@@ -54,7 +54,9 @@
     <div class="container content">
         <img src="https://user-images.githubusercontent.com/9032347/151912335-695a8b1a-40d2-4674-803f-773de641a5a8.gif"
             style="image-rendering: pixelated;" loading=”lazy” decoding="async">
-        <div class="caption">LiDAR range images from KITTI [Geiger et al. IJRR 2013]</div>
+        <div class="caption">LiDAR range images from KITTI <a
+                href="https://journals.sagepub.com/doi/full/10.1177/0278364913491297">[Geiger et al. IJRR 2013]</a>
+        </div>
         <p>
         <h5 style="text-align: center;">
             <i>Q: How can we build LiDAR data priors from the "dusty" measurement?</i>
@@ -64,6 +66,7 @@
 
     <div class="container content">
         <h2>Abstract</h2>
+        <b>TL;DR: Training GANs on LiDAR range images through differentiable pseudo measurement.</b>
         <p>
             3D laser scanning by LiDAR sensors plays an important role for mobile robots to understand their
             surroundings. Nevertheless, not all systems have high resolution and accuracy due to hardware limitations,
@@ -85,13 +88,22 @@
     <div class="container content">
         <h2>Overview</h2>
         <p>
-            We propose <b>DUSty</b> (depth w/ uncertainty as 2D style), a noise-aware GAN framework for LiDAR range
+            We propose <b>DUSty</b> (depth with uncertainty as 2D style), a noise-aware GAN framework for LiDAR range
             images with the dropout noises. DUSty learns the decomposed representation of depth and noise through a
             pseudo-measurement process.
         </p>
         <img src="https://raw.githubusercontent.com/kazuto1011/dusty-gan/main/docs/model.svg" loading=”lazy”
             decoding="async" width="100%">
         <div class="caption">Model overview</div>
+        <br>
+        <p>
+            We formulate the LiDAR measurement as Bernoulli sampling with the structured probability map
+            (measurability). To learn the discrete sampling function jointly with the depth modality, the gradients of
+            the sampled noise are re-parameterized by straight-through Gumbel-Sigmoid <a
+                href="https://arxiv.org/abs/1611.00712">[Maddison et al. ICLR 2017]</a>.
+        </p>
+        <img src="imgs/gumbel.svg" loading=”lazy” decoding="async" width="70%">
+        <div class="caption">Pseudo measurement model</div>
     </div>
 
     <div class="container content">
@@ -110,8 +122,8 @@
         <p>
             The trained generator can be used as <b>scene priors</b> to restore LiDAR data.
         </p>
-        <img src="https://raw.githubusercontent.com/kazuto1011/dusty-gan/05ba8f660622c5b1538e9ddc5413481ae9ddc49d/docs/example.svg"
-            style="image-rendering: pixelated;" loading=”lazy” decoding="async" width="100%">
+        <img src="imgs/restoration_1.svg" style="image-rendering: pixelated;" loading=”lazy” decoding="async"
+            width="100%">
         <div class="caption">Reconstructing given range images by GAN inversion</div>
     </div>
 
@@ -129,7 +141,7 @@
 
     <div class="container content">
         <h5 style="text-align: center;">
-            <i>Check out our new <a href="../dusty-v2" target="_blank" rel="noopener">DUSty v2</a>!</i><br>
+            <i>Check out our new <a href="../dusty-gan-v2" target="_blank" rel="noopener">DUSty v2</a>!</i><br>
             <i>We provide a resolution-free architecture and Sim2Real demonstration!</i>
         </h5>
     </div>
