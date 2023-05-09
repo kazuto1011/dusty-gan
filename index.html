@@ -1,135 +1,132 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Learning to Drop Points for LiDAR Scan Synthesis (IROS 2021)</title>
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-Zenh87qX5JnK2Jl0vWa8Ck2rdkQ2Bzep5IDxbcnCeuOxjzrPF/et3URy9Bv1WTRi" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"
-        integrity="sha512-xh6O/CkQoPOWDdYTDqeRdPCVd1SpvCA9XXcUnZS2FmJNp1coAFzvtCN9BmamE+4aHK8yyUHUSCcJHgXloTyT2A=="
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-Zenh87qX5JnK2Jl0vWa8Ck2rdkQ2Bzep5IDxbcnCeuOxjzrPF/et3URy9Bv1WTRi"
+      crossorigin="anonymous" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css"
+      integrity="sha512-xh6O/CkQoPOWDdYTDqeRdPCVd1SpvCA9XXcUnZS2FmJNp1coAFzvtCN9BmamE+4aHK8yyUHUSCcJHgXloTyT2A=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" , href="css/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" , href="css/main.css" />
 
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-79606002-1"></script>
     <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag() { dataLayer.push(arguments); }
-        gtag('js', new Date());
-        gtag('config', 'UA-79606002-1');
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        dataLayer.push(arguments);
+      }
+      gtag("js", new Date());
+      gtag("config", "G-HJM3XH5K6G");
     </script>
-</head>
+  </head>
 
-<body>
+  <body>
     <div class="container header">
-        <h5>DUSty (2021) / <a href="../dusty-gan-v2" target="_blank" rel="noopener">DUSty v2 (2023)</a></h5>
+      <h5>
+        DUSty (2021) /
+        <a href="../dusty-gan-v2" target="_blank" rel="noopener">DUSty v2 (2023)</a>
+      </h5>
     </div>
 
     <div class="container header">
-        <h1 class="title">Learning to Drop Points for LiDAR Scan Synthesis</h1>
-        <h5 class="authors">
-            <a href="https://kazuto1011.github.io/" target="_blank" rel="noopener">Kazuto Nakashima</a>
-            &nbsp;&nbsp;&nbsp;
-            <a href="https://robotics.ait.kyushu-u.ac.jp/kurazume/en/" target="_blank" rel="noopener">Ryo Kurazume</a>
-        </h5>
-        <h5 class="affiliations">
-            Kyushu University
-        </h5>
-        <h5 class="conference">
-            IROS 2021
-        </h5>
-        <div class="materials">
-            <a href="https://arxiv.org/abs/2102.11952" target="_blank" rel="noopener"><i
-                    class="fa-solid fa-file-pdf"></i></a>
-            &nbsp;&nbsp;&nbsp;
-            <a href="https://github.com/kazuto1011/dusty-gan" target="_blank" rel="noopener"><i
-                    class="fa-brands fa-github"></i></a>
-        </div>
+      <h1 class="title">Learning to Drop Points for LiDAR Scan Synthesis</h1>
+      <h5 class="authors">
+        <a href="https://kazuto1011.github.io/" target="_blank" rel="noopener">Kazuto Nakashima</a>
+        &nbsp;&nbsp;&nbsp;
+        <a href="https://robotics.ait.kyushu-u.ac.jp/kurazume/en/" target="_blank" rel="noopener">Ryo Kurazume</a>
+      </h5>
+      <h5 class="affiliations">Kyushu University</h5>
+      <h5 class="conference">IROS 2021</h5>
+      <div class="materials">
+        <a href="https://arxiv.org/abs/2102.11952" target="_blank" rel="noopener"><i class="fa-solid fa-file-pdf"></i></a>
+        &nbsp;&nbsp;&nbsp;
+        <a href="https://github.com/kazuto1011/dusty-gan" target="_blank" rel="noopener"><i class="fa-brands fa-github"></i></a>
+      </div>
     </div>
 
     <div class="container content">
-        <img src="https://user-images.githubusercontent.com/9032347/151912335-695a8b1a-40d2-4674-803f-773de641a5a8.gif"
-            style="image-rendering: pixelated;" loading=”lazy” decoding="async">
-        <div class="caption">LiDAR range images from KITTI <a
-                href="https://journals.sagepub.com/doi/full/10.1177/0278364913491297">[Geiger et al. IJRR 2013]</a>
-        </div>
-        <p>
-        <h5 style="text-align: center;">
-            <i>Q: How can we build LiDAR data priors from the "dusty" measurement?</i>
-        </h5>
-        </p>
+      <img
+        src="https://user-images.githubusercontent.com/9032347/151912335-695a8b1a-40d2-4674-803f-773de641a5a8.gif"
+        style="image-rendering: pixelated"
+        loading="”lazy”"
+        decoding="async" />
+      <div class="caption">
+        LiDAR range images from KITTI
+        <a href="https://journals.sagepub.com/doi/full/10.1177/0278364913491297">[Geiger et al. IJRR 2013]</a>
+      </div>
+      <h5 style="text-align: center">
+        <i>Q: How can we build LiDAR data priors from the "dusty" measurement?</i>
+      </h5>
     </div>
 
     <div class="container content">
-        <h2>Abstract</h2>
-        <b>TL;DR: Training GANs on LiDAR range images through differentiable pseudo measurement.</b>
-        <p>
-            3D laser scanning by LiDAR sensors plays an important role for mobile robots to understand their
-            surroundings. Nevertheless, not all systems have high resolution and accuracy due to hardware limitations,
-            weather conditions, and so on. Generative modeling of LiDAR data as scene priors is one of the promising
-            solutions to compensate for unreliable or incomplete observations. In this paper, we propose a novel
-            generative model for learning LiDAR data based on generative adversarial networks. As in the related
-            studies, we process LiDAR data as a compact yet lossless representation, a cylindrical depth map. However,
-            despite the smoothness of real-world objects, many points on the depth map are dropped out through the laser
-            measurement, which causes learning difficulty on generative models. To circumvent this issue, we introduce
-            measurement uncertainty into the generation process, which allows the model to learn a disentangled
-            representation of the underlying shape and the dropout noises from a collection of real LiDAR data. To
-            simulate the lossy measurement, we adopt a differentiable sampling framework to drop points based on the
-            learned uncertainty. We demonstrate the effectiveness of our method on synthesis and reconstruction tasks
-            using two datasets. We further showcase potential applications by restoring LiDAR data with various types of
-            corruption.
-        </p>
+      <h2>Abstract</h2>
+      <b>TL;DR: Training GANs on LiDAR range images through differentiable pseudo measurement.</b>
+      <p>
+        3D laser scanning by LiDAR sensors plays an important role for mobile robots to understand their surroundings. Nevertheless, not all systems
+        have high resolution and accuracy due to hardware limitations, weather conditions, and so on. Generative modeling of LiDAR data as scene
+        priors is one of the promising solutions to compensate for unreliable or incomplete observations. In this paper, we propose a novel generative
+        model for learning LiDAR data based on generative adversarial networks. As in the related studies, we process LiDAR data as a compact yet
+        lossless representation, a cylindrical depth map. However, despite the smoothness of real-world objects, many points on the depth map are
+        dropped out through the laser measurement, which causes learning difficulty on generative models. To circumvent this issue, we introduce
+        measurement uncertainty into the generation process, which allows the model to learn a disentangled representation of the underlying shape and
+        the dropout noises from a collection of real LiDAR data. To simulate the lossy measurement, we adopt a differentiable sampling framework to
+        drop points based on the learned uncertainty. We demonstrate the effectiveness of our method on synthesis and reconstruction tasks using two
+        datasets. We further showcase potential applications by restoring LiDAR data with various types of corruption.
+      </p>
     </div>
 
     <div class="container content">
-        <h2>Overview</h2>
-        <p>
-            We propose <b>DUSty</b> (depth with uncertainty as 2D style), a noise-aware GAN framework for LiDAR range
-            images with the dropout noises. DUSty learns the decomposed representation of depth and noise through a
-            pseudo-measurement process.
-        </p>
-        <img src="https://raw.githubusercontent.com/kazuto1011/dusty-gan/main/docs/model.svg" loading=”lazy”
-            decoding="async" width="100%">
-        <div class="caption">Model overview</div>
-        <br>
-        <p>
-            We formulate the LiDAR measurement as Bernoulli sampling with the structured probability map
-            (measurability). To learn the discrete sampling function jointly with the depth modality, the gradients of
-            the sampled noise are re-parameterized by straight-through Gumbel-Sigmoid <a
-                href="https://arxiv.org/abs/1611.00712">[Maddison et al. ICLR 2017]</a>.
-        </p>
-        <img src="imgs/gumbel.svg" loading=”lazy” decoding="async" width="70%">
-        <div class="caption">Pseudo measurement model</div>
+      <h2>Overview</h2>
+      <p>
+        We propose <b>DUSty</b> (depth with uncertainty as 2D style), a noise-aware GAN framework for LiDAR range images with the dropout noises.
+        DUSty learns the decomposed representation of depth and noise through a pseudo-measurement process.
+      </p>
+      <img src="https://raw.githubusercontent.com/kazuto1011/dusty-gan/main/docs/model.svg" loading="”lazy”" decoding="async" width="100%" />
+      <div class="caption">Model overview</div>
+      <br />
+      <p>
+        We formulate the LiDAR measurement as Bernoulli sampling with the structured probability map (measurability). To learn the discrete sampling
+        function jointly with the depth modality, the gradients of the sampled noise are re-parameterized by straight-through Gumbel-Sigmoid
+        <a href="https://arxiv.org/abs/1611.00712">[Maddison et al. ICLR 2017]</a>.
+      </p>
+      <img src="imgs/gumbel.svg" loading="”lazy”" decoding="async" width="70%" />
+      <div class="caption">Pseudo measurement model</div>
     </div>
 
     <div class="container content">
-        <h2>Generation</h2>
-        <p>
-            From left to right: learned complete depth, point-wise measurability, and the final range
-            images.
-        </p>
-        <img src="https://user-images.githubusercontent.com/9032347/127803595-6e378bab-f709-4476-a528-73460a503e76.gif"
-            style="image-rendering: pixelated;" loading=”lazy” decoding="async" width="100%">
-        <div class="caption">Random walk in the latent space</div>
+      <h2>Generation</h2>
+      <p>From left to right: learned complete depth, point-wise measurability, and the final range images.</p>
+      <img
+        src="https://user-images.githubusercontent.com/9032347/127803595-6e378bab-f709-4476-a528-73460a503e76.gif"
+        style="image-rendering: pixelated"
+        loading="”lazy”"
+        decoding="async"
+        width="100%" />
+      <div class="caption">Random walk in the latent space</div>
     </div>
 
     <div class="container content">
-        <h2>Restoration</h2>
-        <p>
-            The trained generator can be used as <b>scene priors</b> to restore LiDAR data.
-        </p>
-        <img src="imgs/restoration_1.svg" style="image-rendering: pixelated;" loading=”lazy” decoding="async"
-            width="100%">
-        <div class="caption">Reconstructing given range images by GAN inversion</div>
+      <h2>Restoration</h2>
+      <p>The trained generator can be used as <b>scene priors</b> to restore LiDAR data.</p>
+      <img src="imgs/restoration_1.svg" style="image-rendering: pixelated" loading="”lazy”" decoding="async" width="100%" />
+      <div class="caption">Reconstructing given range images by GAN inversion</div>
     </div>
 
     <div class="container content">
-        <h2>Citation</h2>
-        <pre class="bibtex">
+      <h2>Citation</h2>
+      <pre class="bibtex">
 <code>@inproceedings{nakashima2021learning,
     author    = {Nakashima, Kazuto and Kurazume, Ryo},
     title     = {Learning to Drop Points for LiDAR Scan Synthesis},
@@ -140,23 +137,20 @@
     </div>
 
     <div class="container content">
-        <h5 style="text-align: center;">
-            <i>Check out our new <a href="../dusty-gan-v2" target="_blank" rel="noopener">DUSty v2</a>!</i><br>
-            <i>We provide a resolution-free architecture and Sim2Real demonstration!</i>
-        </h5>
+      <h5 style="text-align: center">
+        <i>Check out our new <a href="../dusty-gan-v2" target="_blank" rel="noopener">DUSty v2</a>!</i><br />
+        <i>We provide a resolution-free architecture and Sim2Real demonstration!</i>
+      </h5>
     </div>
 
     <div class="container content">
-        <h2>Acknowledgments</h2>
-        <p>
-            This work was supported by a Grant-in-Aid for JSPS Fellows Grant Number JP19J12159 and JSPS KAKENHI Grant
-            Number JP20H00230.
-        </p>
+      <h2>Acknowledgments</h2>
+      <p>This work was supported by a Grant-in-Aid for JSPS Fellows Grant Number JP19J12159 and JSPS KAKENHI Grant Number JP20H00230.</p>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-OERcA2EqjJCMA+/3y+gxIOqMEjwtxJY7qPCqsdltbNJuaOe923+mo//f6V8Qbsw3"
-        crossorigin="anonymous"></script>
-</body>
-
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-OERcA2EqjJCMA+/3y+gxIOqMEjwtxJY7qPCqsdltbNJuaOe923+mo//f6V8Qbsw3"
+      crossorigin="anonymous"></script>
+  </body>
 </html>
